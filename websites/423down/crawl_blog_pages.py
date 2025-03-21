@@ -1,7 +1,13 @@
+import hashlib
 import requests
 from lxml import html
 import random
-def crawl_blog_pages(base_url, start_page, end_page, li_selector):
+import json
+
+from websites.tools.MySQLHandler import MySQLHandler
+
+
+def crawl_blog_pages(base_url, start_page, end_page ):
     """
     抓取博客列表页面及其子页面内容的函数
 
@@ -38,17 +44,33 @@ def crawl_blog_pages(base_url, start_page, end_page, li_selector):
                 tree = html.fromstring(response.text)
                 # 找到所有文章链接
                 li_elements = tree.xpath("/html/body/div[3]/div[1]/div")
-                result = []
                 for info in li_elements:
-                    url = info.xpath('.//ul/li/a[1]/@href')
-                    titles = info.xpath('.//ul/li/h2/a/text()')
+                    title = info.xpath(".//ul/li/h2/a/text()")
+                    postUrl = info.xpath(".//ul/li/a[1]/@href")
+                    image_url = info.xpath(".//ul/li/a/img/@src")
 
-                    print("result:", titles)
+                    if len(title) == len(postUrl) == len(image_url):
+                        for i in range(len(title)):
 
+                            blog_data = {
+                                'crawled_title': title[i],
+                                'url_to_crawl': postUrl[i],
+                                'crawled_image_url': image_url[i],
+                                'crawled_name': "423down",
+                                'hash_url': hashlib.md5(postUrl[i].encode('utf-8')).hexdigest()
+                            }
+                            print(blog_data)
+                            dbconn = MySQLHandler("../../config.yml")
+                            try:
+                                dbconn.insert("crawl_info", blog_data)
+                            except Exception as e:
+                                print(f"Error inserting data: {e}")
+                            print("---")
+                            dbconn.close()
 
-
+                            all_blogs.append(blog_data)
         except requests.RequestException as e:
             print(f"Error fetching blog list {page_url}: {e}")
-
+    jsondata = json.dumps(all_blogs, indent=4, ensure_ascii=False)
 if __name__ == "__main__":
-    crawl_blog_pages("https://www.423down.com/page/", 1, 1, '//*[@id="hasfixed"]//ul/li/h2')
+    crawl_blog_pages("https://www.423down.com/page/", 1, 2)
